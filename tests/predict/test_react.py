@@ -1,7 +1,72 @@
 from dataclasses import dataclass
+from typing import List, Optional, Union
 
 import dspy
+import dspy.utils
+from dspy.signatures.signature import SignatureMeta
 from dspy.utils.dummies import dummy_rm
+
+
+def test_thought_and_action_in_one_completion():
+    lm = dspy.utils.DummyLM(
+        [
+            """Inital thoughts\nAction 1:Finish[the awnsers are:\n\n
+               1. [bob](bob.com)
+               2. [alice](alice.com)]""",
+        ]
+    )
+    dspy.settings.configure(lm=lm, rm=dummy_rm())
+    program = dspy.ReAct("question -> answer")
+    question = "What are some links associated with alice and bob?"
+    result = program(question=question)
+    assert (
+        result.answer
+        == """the awnsers are:\n\n
+               1. [bob](bob.com)
+               2. [alice](alice.com)"""
+    )
+
+
+def test_multiline_markdown_finish_action():
+    lm = dspy.utils.DummyLM(
+        [
+            "Inital thoughts",
+            """Finish[the awnsers are:\n\n
+               1. [bob](bob.com)
+               2. [alice](alice.com)]""",
+        ]
+    )
+    dspy.settings.configure(lm=lm, rm=dummy_rm())
+    program = dspy.ReAct("question -> answer")
+    question = "What are some links associated with alice and bob?"
+    result = program(question=question)
+    assert (
+        result.answer
+        == """the awnsers are:\n\n
+               1. [bob](bob.com)
+               2. [alice](alice.com)"""
+    )
+
+
+def test_multiline_finish_action():
+    lm = dspy.utils.DummyLM(
+        [
+            "Inital thoughts",
+            """Finish[the awnsers are:\n
+               1. bob
+               2. alice]""",
+        ]
+    )
+    dspy.settings.configure(lm=lm, rm=dummy_rm())
+    program = dspy.ReAct("question -> answer")
+    question = "What are some common names used in security testing?"
+    result = program(question=question)
+    assert (
+        result.answer
+        == """the awnsers are:\n
+               1. bob
+               2. alice"""
+    )
 
 
 def test_example_no_tools():
@@ -32,9 +97,7 @@ def test_example_no_tools():
         print("---")
 
     assert lm.get_convo(-1).endswith(
-        "Question: What is the color of the sky?\n"
-        "Thought 1: Initial thoughts\n"
-        "Action 1: Finish[blue]"
+        "Question: What is the color of the sky?\n" "Thought 1: Initial thoughts\n" "Action 1: Finish[blue]"
     )
 
 
@@ -157,7 +220,7 @@ def test_custom_tools():
 
 
 def test_signature_instructions():
-    class ExampleSignature(dspy.Signature):
+    class ExampleSignature(dspy.Signature, metaclass=SignatureMeta):
         """You are going to generate output based on input."""
 
         input = dspy.InputField()
